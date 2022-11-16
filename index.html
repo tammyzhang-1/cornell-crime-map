@@ -1,0 +1,483 @@
+<html>
+  <head>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="public/styles/site.css"/>
+  </head>
+
+  <body>
+    <main>
+      <div id="site-header">
+        <h1>Crimes at Cornell University in Ithaca, NY (2020 - 2022)</h1>
+      </div>
+      <div id="map-body">
+        <svg id="map" width = "1000" height = "640"></svg>
+        <aside>
+          <div id="sidebar">
+            <div id="filter-container">
+              <h2>Filter by:</h2>
+              <div id="map-filters">
+                <button class="filter" id="agency_assistance">Agency Assistance</button>
+                <button class="filter" id="crimes_person">Crimes Against a Person</button>
+                <button class="filter" id="crimes_property">Crimes Against Property</button>
+                <button class="filter" id="victimless">Victimless Crime</button>
+                <button class="filter" id="traffic">Traffic and Local Law Violations</button>
+                <button class="filter" id="fraud">Fraud and Impersonation</button>
+                <button class="filter" id="other">Other</button>
+                <button class="filter" id="clear">Clear Filters</button>
+              </div>
+              <div id="map-year-filter">
+                <label for="year" id="year_slider_label">Date Reported</label>
+                <input id="year_slider_input" type="range" id="year" name="year" min="0" max="4" step="1" value="4" width= 400>
+              <div id="yearSliderDiv"></div>
+              <button id="alltimes">All Times</button>
+
+            </div>
+
+            <div id="crime-info-box">
+              <span id="intro-text">
+                A map displaying criminal incidents reported to the Cornell University Police Department, from
+                Fall 2020 through October 22. <br />
+                <br />
+                Filter by incident type or semester above. <br />
+                <br />
+                &#8592; Click on a dot to see incident details.
+
+              </span>
+              <div>
+                <span class="hidden crime-info-label">Location:</span>
+                <span id="crime-location-info"></span>
+              </div>
+
+              <div>
+                <span class="hidden crime-info-label">Incident Type:</span>
+                <span id="crime-incident-info"></span>
+              </div>
+
+              <div>
+                <span class="hidden crime-info-label">Date Occurred:</span>
+                <span id="crime-date-occurred-info"></span>
+              </div>
+
+              <div>
+                <span class="hidden crime-info-label">Date Reported:</span>
+                <span id="crime-date-reported-info"></span>
+              </div>
+
+              <div>
+                <span class="hidden crime-info-label">Disposition:</span>
+                <span id="crime-disposition-info"></span>
+              </div>
+
+              <div>
+                <span class="hidden crime-info-label">Narrative:</span>
+                <span id="crime-narrative-info"></span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <script>
+      const svg = d3.select("#map");
+      const width = svg.attr("width");
+      const height = svg.attr("height");
+      const margin = { top: 20, right: 20, bottom: 20, left:20};
+      const mapWidth = width - margin.left - margin.right;
+      const mapHeight = height - margin.top - margin.bottom;
+      const map = svg.append("g")
+                     .attr("transform","translate("+margin.left+","+margin.top+")");
+
+      const requestData = async function() {
+        const boundaries = await d3.json("public/resources/bounds_simplified.json");
+        const buildings = await d3.json("public/resources/buildings_simplified.json");
+
+
+        var counties = topojson.feature(boundaries, boundaries.objects.bounds);
+        var countyMesh = topojson.mesh(boundaries, boundaries.objects.bounds);
+
+        var building_outlines = topojson.feature(buildings, buildings.objects.buildings);
+        var buildingMesh = topojson.mesh(buildings, buildings.objects.buildings)
+
+        var projection = d3.geoMercator().fitSize([mapWidth, mapHeight], counties);
+        var path = d3.geoPath().projection(projection);
+
+        let countyPaths = map.selectAll("path.county").data(counties.features)
+                        .join("path")
+                        .attr("class", "county")
+                        .attr("d", path)
+
+        map.append("path").datum(countyMesh)
+            .attr("class","outline")
+            .attr("d", path);
+
+        let buildingPaths = map.selectAll("path.building").data(building_outlines.features)
+                        .join("path")
+                        .attr("class", "building")
+                        .attr("d", path)
+                        .style("stroke-width", 1)
+
+
+        const crimes = await d3.csv("public/resources/crime-data.csv");
+
+        //jitter
+        function jitter(){
+            return d3.randomUniform(-1,1)();
+        }
+
+        crimes.forEach(d=>{
+          d.Latitude = parseFloat(d.coords.substring(1, d.coords.indexOf(",")))
+          d.Longitude = parseFloat(d.coords.substring(d.coords.indexOf(",")+2, d.coords.length-2))
+          d.position = projection([d.Longitude, d.Latitude])
+          d.position[0] = d.position[0]+jitter()
+          d.position[1] = d.position[1]+jitter()
+          d.incident_bin = d.incident_bin.split(",").map(d=>d.trim());
+          date_array = d.Reported.split("/", 3);
+          date_array[2] = "20" + date_array[2].substring(0,2)
+          d.Reported_date= new Date(date_array[2], date_array[0]-1, date_array[1]);
+        })
+
+        colorScale = d3.scaleOrdinal()
+                       .domain(['Agency Assistance', 'Crimes Against Property', 'Victimless Crime', 'Fraud and Impersonation', 'Traffic and Local Law Violations', 'Crimes Against a Person', 'Other'])
+                       .range(['#396E32', '#406BDF', '#CE8C40', '#9857AC', '#4EA6C6', '#932929', '#333333'])
+
+        //appending all the data points
+        let circles = map.selectAll("circle.point").data(crimes)
+             .join("circle").attr("class","point")
+             .attr("cx", d=>d.position[0])
+             .attr("cy", d=>d.position[1])
+             .attr("r", 4)
+             .attr("opacity", 0.88)
+             .style("fill", d=>colorScale(d.incident_bin[0]))
+             .on('mouseover',  mouseEntersPoint)
+             .on('mouseout',  mouseLeavesPoint);
+
+        //filtering buttons
+        let filters = d3.selectAll(".filter")
+
+        let current_filter = "Clear"
+        var allyears_on = true;
+
+        agency_button = d3.select("#agency_assistance").on("click", function(){
+          filters.style("background-color", "white").style("border-width", "2px").style("font-weight", "normal")
+          d3.select("#agency_assistance").style("background-color", "#E9E9E9").style("border-width", "4px").style("font-weight", "bold")
+          current_filter = "Agency Assistance"
+          var slider = document.getElementById("year_slider_input");
+          if(allyears_on){
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Agency Assistance") : colorScale(d.incident_bin[0]))
+
+          }
+          else{
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.Reported_date>=(dates_list[slider.value][0]) && d.Reported_date<=(dates_list[slider.value][1]))) && ((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')))
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Agency Assistance") : colorScale(d.incident_bin[0]))
+
+          }
+        })
+        crimes_person_button = d3.select("#crimes_person").on("click", function(){
+          filters.style("background-color", "white").style("border-width", "2px").style("font-weight", "normal")
+          d3.select("#crimes_person").style("background-color", "#E9E9E9").style("border-width", "4px").style("font-weight", "bold")
+          current_filter = "Crimes Against a Person"
+          var slider = document.getElementById("year_slider_input");
+          if(allyears_on){
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Crimes Against a Person") : colorScale(d.incident_bin[0]))
+          }
+          else{
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.Reported_date>=(dates_list[slider.value][0]) && d.Reported_date<=(dates_list[slider.value][1]))) && ((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')))
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Crimes Against a Person") : colorScale(d.incident_bin[0]))
+          }
+        })
+        crimes_property_button = d3.select("#crimes_property").on("click", function(){
+          filters.style("background-color", "white").style("border-width", "2px").style("font-weight", "normal")
+          d3.select("#crimes_property").style("background-color", "#E9E9E9").style("border-width", "4px").style("font-weight", "bold")
+          current_filter = "Crimes Against Property"
+          var slider = document.getElementById("year_slider_input");
+          if(allyears_on){
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Crimes Against Property") : colorScale(d.incident_bin[0]))
+
+          }
+          else{
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.Reported_date>=(dates_list[slider.value][0]) && d.Reported_date<=(dates_list[slider.value][1]))) && ((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')))
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Crimes Against Property") : colorScale(d.incident_bin[0]))
+
+          }
+        })
+        traffic_button = d3.select("#traffic").on("click", function(){
+          filters.style("background-color", "white").style("border-width", "2px").style("font-weight", "normal")
+          d3.select("#traffic").style("background-color", "#E9E9E9").style("border-width", "4px").style("font-weight", "bold")
+          current_filter = "Traffic and Local Law Violations"
+          var slider = document.getElementById("year_slider_input");
+          if(allyears_on){
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Traffic and Local Law Violations") : colorScale(d.incident_bin[0]))
+
+          }
+          else{
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.Reported_date>=(dates_list[slider.value][0]) && d.Reported_date<=(dates_list[slider.value][1]))) && ((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')))
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Traffic and Local Law Violations") : colorScale(d.incident_bin[0]))
+
+          }
+        })
+        fraud_button = d3.select("#fraud").on("click", function(){
+          filters.style("background-color", "white").style("border-width", "2px").style("font-weight", "normal")
+          d3.select("#fraud").style("background-color", "#E9E9E9").style("border-width", "4px").style("font-weight", "bold")
+          current_filter = "Fraud and Impersonation"
+          var slider = document.getElementById("year_slider_input");
+          if(allyears_on){
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Fraud and Impersonation") : colorScale(d.incident_bin[0]))
+
+          }
+          else{
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.Reported_date>=(dates_list[slider.value][0]) && d.Reported_date<=(dates_list[slider.value][1]))) && ((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')))
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Fraud and Impersonation") : colorScale(d.incident_bin[0]))
+
+          }
+        })
+        victimless_button = d3.select("#victimless").on("click", function(){
+          filters.style("background-color", "white").style("border-width", "2px").style("font-weight", "normal")
+          d3.select("#victimless").style("background-color", "#E9E9E9").style("border-width", "4px").style("font-weight", "bold")
+          current_filter = 'Victimless Crime'
+          var slider = document.getElementById("year_slider_input");
+          if(allyears_on){
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale('Victimless Crime') : colorScale(d.incident_bin[0]))
+
+          }
+          else{
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.Reported_date>=(dates_list[slider.value][0]) && d.Reported_date<=(dates_list[slider.value][1]))) && ((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')))
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale('Victimless Crime') : colorScale(d.incident_bin[0]))
+
+          }
+        })
+        other_button = d3.select("#other").on("click", function(){
+          filters.style("background-color", "white").style("border-width", "2px").style("font-weight", "normal")
+          d3.select("#other").style("background-color", "#E9E9E9").style("border-width", "4px").style("font-weight", "bold")
+          current_filter = "Other"
+          var slider = document.getElementById("year_slider_input");
+          if(allyears_on){
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Other") : colorScale(d.incident_bin[0]))
+
+          }
+          else{
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.Reported_date>=(dates_list[slider.value][0]) && d.Reported_date<=(dates_list[slider.value][1]))) && ((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')))
+                                        .style("fill", d=> d.incident_bin.includes(current_filter) ? colorScale("Other") : colorScale(d.incident_bin[0]))
+
+          }
+        })
+        clear_button = d3.select("#clear").on("click", function(){
+          filters.style("background-color", "white").style("border-width", "2px").style("font-weight", "normal")
+          var slider = document.getElementById("year_slider_input");
+          current_filter = "Clear"
+          if(allyears_on){
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", "visible")
+          }
+          else{
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.Reported_date>=(dates_list[slider.value][0]) && d.Reported_date<=(dates_list[slider.value][1]))) ? "visible" : 'hidden')))
+          }
+
+        })
+
+        //YEAR SLIDER
+        let dateExtent = d3.extent(crimes, d => d['Reported_date']);
+        let dateScale = d3.scaleLinear().domain(dateExtent).range([0, 400]);
+
+        var formatDate = d3.timeFormat("%b-%Y")
+
+        dates_list = [[new Date(2020, 9-1, 1), new Date(2020, 12-1, 31)],[new Date(2021,1-1, 1), new Date(2021, 6-1, 31)], [new Date(2021, 7-1, 1), new Date(2021, 12-1, 31)], [new Date(2022, 1-1, 1), new Date(2022, 6-1, 31)], [new Date(2022, 6-1, 1), new Date(2022, 12-1, 31)]]
+
+
+        //manually set ticks
+        d3.select("#yearSliderDiv").append('g')
+                                    .attr('class', 'year_axis')
+        ticks_list = ["Fall 2020", "Spring 2021",  "Fall 2021",  "Spring 2022",  "Fall 2022"]
+        ticks_list.forEach(d=>{
+          d3.select('.year_axis').append("g").text(d).attr('class', 'year_tick')//.style("font-size", "1vw");
+        })
+
+        //styling slider
+        year_slider = d3.select("#year_slider_input").on("change", function(){
+          var slider = document.getElementById("year_slider_input");
+          allyears_on = false;
+          d3.selectAll("#year_slider_input").style("background", "#d3d3d3")
+          map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.Reported_date>=(dates_list[slider.value][0]) && d.Reported_date<=(dates_list[slider.value][1]))) && ((d.incident_bin.includes(current_filter) || current_filter==="All" || current_filter==="Clear")) ? "visible" : 'hidden')))
+        }).on("click", function(){
+          var slider = document.getElementById("year_slider_input");
+          allyears_on = false;
+          d3.selectAll("#year_slider_input").style("background", "#d3d3d3")
+          map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.Reported_date>=(dates_list[slider.value][0]) && d.Reported_date<=(dates_list[slider.value][1]))) && ((d.incident_bin.includes(current_filter) || current_filter==="All" || current_filter==="Clear")) ? "visible" : 'hidden')))
+        })
+
+        //all years button to show all data points again and styling slider to be entirely blue
+        allyears_button = d3.select("#alltimes").on("click", function(){
+          allyears_on = true;
+          if(current_filter==="Clear"){
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", "visible")
+          }
+          else{
+            map.selectAll("circle.point").data(crimes)
+                                        .attr("visibility", d=>((((d.incident_bin.includes(current_filter))) ? "visible" : 'hidden')))
+          }
+          d3.selectAll("#year_slider_input").attr("value", 4).style("background", "blue")
+          var slider = document.getElementById("year_slider_input");
+          slider.value = 4;
+
+        })
+
+        //style slider when "All Times" is active, default before "All Times" button is clicked
+        if(allyears_on){
+          d3.selectAll("#year_slider_input").style("background", "blue")
+          var slider = document.getElementById("year_slider_input");
+          slider.value = 4;
+        }
+
+
+
+        // MOUSEOVERS
+
+        let crime_info = d3.select("#crime-info-box")
+
+        circles.on("click", function() {
+              //set all circles to no outline
+              d3.selectAll("circle.point").attr("stroke", "none");
+              //only outline this one
+              d3.select(this)
+                .attr("stroke", "black")
+
+              let location = d3.select(this).datum()['Location'];
+              let incident = d3.select(this).datum()['IncidentType'];
+              let date_occurred = d3.select(this).datum()['Occurred'];
+              let date_reported = d3.select(this).datum()['Reported'];
+              let disposition = d3.select(this).datum()['Disposition'];
+              let narrative = d3.select(this).datum()['Narrative'];
+
+              d3.selectAll('.crime-info-label').classed("hidden", false)
+
+              d3.selectAll("#intro-text").attr("class", "hidden")
+
+              d3.select("#crime-location-info").text(location)
+              d3.select("#crime-incident-info").text(incident)
+              d3.select("#crime-date-occurred-info").text(date_occurred)
+              d3.select("#crime-date-reported-info").text(date_reported)
+              d3.select("#crime-disposition-info").text(disposition)
+              d3.select("#crime-narrative-info").text(narrative)
+          })
+
+
+        //mouseovers with location - tooltip
+        let tooltipWidth = 300;
+        let tooltipHeight = 30;
+
+        let tooltip = map.append("g")
+                     .attr("class","tooltip")
+                     .attr("visibility","hidden");
+
+        let dx = 0;
+        let dy = 5;
+
+        tooltip.append("rect")
+              .attr("fill", "lightgray")
+              .attr("opacity", 0.8)
+              .attr("x", (-tooltipWidth / 2.0) + dx)
+              .attr("y", 0 + dy)
+              .attr("width",tooltipWidth)
+              .attr("height",tooltipHeight)
+              .attr("class", "hover-label")
+        let txt = tooltip.append("text")
+              .attr("class", "hover-label-text")
+              .attr("fill", "black")
+              .attr("text-anchor","middle")
+              .attr("alignment-baseline","hanging")
+              .attr("font-size", 16)
+              .attr("x", 0 + dx)
+              .attr("y", 10 + dy)
+
+
+        function mouseEntersPoint() {
+
+          tooltip.style("visibility","visible")
+
+          let point = d3.select(this);
+
+          let location = d3.select(this).datum()['Location'];
+          txt.text(location);
+
+          let xPos = d3.select(this).datum().position[0];
+          let yPos = d3.select(this).datum().position[1];
+
+          tooltip.attr("transform",`translate(${xPos},${yPos})`);
+        }
+
+        function mouseLeavesPoint() {
+          let point = d3.select(this);
+
+          tooltip.style("visibility","hidden");
+
+        }
+
+        //pan and zoom
+        var zoom = d3.zoom()
+                     .translateExtent([[-50,-50],[mapWidth+50, mapHeight+50]])
+                     .on("zoom", mapZoomed);
+
+        map.call(zoom)
+        function mapZoomed(event) {
+            map.attr("transform", event.transform);
+
+            //consistent circle and path widths
+            map.selectAll(".point")
+                  .attr("r", 4/(0.7*event.transform.k))
+                  .attr("stroke-width", 4/event.transform.k)
+
+            map.selectAll(".building")
+                  .style("stroke-width", 1 / event.transform.k);
+            map.selectAll(".county")
+                  .style("stroke-width", 1 / event.transform.k);
+
+            d3.select(".hover-label")
+              .attr("x", (-tooltipWidth / 2.0) / event.transform.k)
+              .attr("y", 15 / event.transform.k + 5 / event.transform.k)
+              .attr("width", 300 / event.transform.k)
+              .attr("height", 30 /event.transform.k)
+
+            d3.select(".hover-label-text")
+              .attr("font-size", 16 / event.transform.k)
+              .attr("y", 10 / event.transform.k + 15 / event.transform.k)
+
+            d3.select(".tooltip")
+              .attr("y", 5)
+            //   .attr("transform", `translate(${new_x_transform},${new_y_transform})`)
+
+          }
+
+      }
+      requestData();
+
+    </script>
+
+  </body>
+
+</html>
