@@ -1,0 +1,219 @@
+html, body {
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+}
+
+
+button {
+    font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+    font-size: 1em;
+}
+
+button:hover {
+    cursor: pointer;
+}
+
+main {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+#map-body {
+    display: flex;
+    justify-content: space-between;
+    height: 100%;
+    margin: 0.5em;
+}
+
+svg {
+    height: 100%;
+    width: 75%;
+    padding-top: 60px;
+}
+
+#site-header {
+    z-index: 3;
+    position: fixed;
+    background-color: rgba(0, 0, 0, 0.739);
+    width: 100%;
+}
+
+h1 {
+    text-align: center;
+    color: white;
+    font-weight: normal;
+    font-size: 1.5em;
+}
+
+h2 {
+    font-weight: normal;
+    padding-left: 1em;
+    margin-bottom: 0.2em;
+    
+}
+
+aside {
+    z-index: 1;
+    width: 30%;
+    height: 100%;
+}
+
+#sidebar {
+    position: fixed;
+    height: 100%;
+    margin-top: 3.75em;
+    border-left: solid thin rgb(129, 129, 129);
+}
+
+#map-filters {
+    display:flex;
+    flex-wrap: wrap;
+    padding-left: 1em;
+    padding-right: 1em;
+
+}
+
+#map-year-filter {
+    margin-top: 0.5em;
+    display: flex;
+    flex-direction: column;
+    font-size: 1.25em;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+#year_slider_label{
+    margin-bottom: 10px;
+    /* font-size: 1.5 vw; */
+}
+#year_slider_input{
+    width: 90%;
+    appearance: none;
+    background: #d3d3d3;
+    height: 10px;
+    border-radius: 5px; 
+    margin: auto;
+}
+
+.year_axis{
+    display: flex;
+    justify-content: space-evenly;
+}
+#yearSliderDiv g{
+    text-align: center;
+    vertical-align: middle;
+    font-size: 1vw; /*TOGGLE THIS ON AND OFF FOR HUGE VS SMALL TEXT*/
+}
+
+/* .year_tick{
+    /* font-size: 1.25vw; */
+    /* font-size: 1vw;
+} */ 
+
+#year_slider_input:hover{
+    cursor: pointer;
+}
+
+#alltimes{
+    margin-top: 10px;
+    font-size: 0.75em;
+}
+
+.tick {
+    font-size: 0.85vw;
+}
+
+
+.filter {
+    padding: 0.25em 1em 0.25em 1em;
+    /* white-space: nowrap; */
+    /* border: solid thin rgb(164, 164, 164); */
+    border-radius: 2em;
+    margin: 0.35em;
+    background-color: rgb(253, 253, 253);
+    width:45%;
+    font-size: 1vw;
+}
+
+.filter:hover {
+    background-color: rgb(224, 224, 224);
+}
+
+#agency_assistance {
+    border: solid 2px #396E32;
+}
+
+#crimes_person {
+    border: solid 2px #932929;
+}
+
+#crimes_property {
+    border: solid 2px #406BDF;
+}
+
+#victimless {
+    border: solid 2px #CE8C40;
+}
+
+#traffic {
+    border: solid 2px #4EA6C6;
+}
+
+#fraud {
+    border: solid 2px #9857AC;
+}
+
+#other {
+    border: solid 2px #333333;
+}
+
+#clear {
+    border: solid 2px lightgray;
+    display: inline-block; 
+    width: auto;
+    
+}
+
+/* '#429852', '#406BDF', '#CE8C40', '#9857AC', '#A25FB6', '#932929', '#333333']) */
+
+#crime-info-box {
+    margin-top: 1em;
+    background-color: rgb(215, 215, 215);
+    height: 50%;
+    flex-grow: 2;
+    padding-right: 1em;
+    padding-left: 1em;
+    padding-top: 0.5em;
+}
+
+#crime-info-box > div {
+    margin-top: 0.5em;
+}
+
+.crime-info-label {
+    margin-top: 0.5em;
+    font-weight: bold;
+}
+
+.hidden {
+    display: none;
+}
+
+/* map styling */
+.county {
+    fill: rgb(243, 243, 243);
+  }
+
+  .building {
+    fill:none;
+    stroke: rgb(183, 183, 183);
+    stroke-width: 0.15px;
+  }
+
+  .outline {
+    fill: none;
+    stroke: rgb(180, 180, 180);
+    stroke-width: 0.5px;
+}
